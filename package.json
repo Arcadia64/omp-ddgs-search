@@ -23,6 +23,13 @@
   "omp": {
     "extensions": [
       "./index.ts"
-    ]
+    ],
+    "settings": {
+      "endpoint": {
+        "type": "string",
+        "default": "http://localhost:8091",
+        "description": "Base URL of the DDGS backend used for search and fetch"
+      }
+    }
   }
 }

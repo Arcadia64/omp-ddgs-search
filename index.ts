@@ -25,6 +25,28 @@ interface DdgsConfig {
 const DEFAULT_ENDPOINT = "http://localhost:8091";
 const HEADERS: Record<string, string> = { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" };
 
+// Must match the package "name"; OMP keys plugin settings by it.
+const PLUGIN_NAME = "omp-ddgs-search";
+
+// Read the endpoint from OMP's plugin-settings store — the values written by
+// `omp plugin config set omp-ddgs-search endpoint <url>` and the plugin-manager
+// TUI editor. They live in ~/.omp/plugins/omp-plugins.lock.json under
+// settings[<plugin>]. (OMP does not expose these to extensions at runtime, so
+// we read the file directly.)
+function endpointFromPluginConfig(): string | undefined {
+  try {
+    const registryPath = join(homedir(), ".omp", "plugins", "omp-plugins.lock.json");
+    const parsed = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      settings?: Record<string, Record<string, unknown>>;
+    };
+    const ep = parsed?.settings?.[PLUGIN_NAME]?.["endpoint"];
+    if (typeof ep === "string" && ep.trim()) return ep.trim();
+  } catch {
+    /* registry missing or unreadable — fall through */
+  }
+  return undefined;
+}
+
 function stripScalar(v: string): string {
   let s = v.trim();
   // Drop a trailing inline comment ( ` # ...`).
@@ -83,7 +105,12 @@ function endpointFromConfigYml(): string | undefined {
 }
 
 function loadConfig(): DdgsConfig {
-  // Priority: config.yml (ddgs.endpoint) > DDGS_ENDPOINT env > hardcoded default.
+  // Priority: OMP plugin settings (omp plugin config / TUI editor)
+  //         > config.yml (ddgs.endpoint)
+  //         > DDGS_ENDPOINT env
+  //         > hardcoded default.
+  const fromPlugin = endpointFromPluginConfig();
+  if (fromPlugin) return { endpoint: fromPlugin, headers: HEADERS };
   const fromYml = endpointFromConfigYml();
   if (fromYml) return { endpoint: fromYml, headers: HEADERS };
   const envEp = process.env.DDGS_ENDPOINT;

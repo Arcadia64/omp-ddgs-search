@@ -12,24 +12,20 @@ omp plugin install github:Arcadia64/omp-ddgs-search
 
 OMP auto-discovers the extension on the next session start.
 
-### 2. Point it at your DDGS backend
+### 2. Set the DDGS backend endpoint
 
-Open OMP's config file and add a `ddgs.endpoint` setting:
+The plugin declares an `endpoint` setting, so you can configure it from inside OMP:
 
-- **File to edit:** `~/.omp/agent/config.yml`
-  (on Windows that's `C:\Users\<you>\.omp\agent\config.yml`)
+**Option A — TUI (recommended)**
 
-Add **one** of the following to that file:
+Open the plugin manager, select **omp-ddgs-search**, highlight `endpoint`, press **Enter** to edit, and type your URL.
 
-```yaml
-# nested block
-ddgs:
-  endpoint: https://your-ddgs-server.example.com
-```
+**Option B — CLI**
 
-```yaml
-# ...or a flat key (equivalent)
-ddgs.endpoint: https://your-ddgs-server.example.com
+```bash
+omp plugin config set  omp-ddgs-search endpoint https://your-ddgs-server.example.com
+omp plugin config get  omp-ddgs-search endpoint
+omp plugin config list omp-ddgs-search
 ```
 
 ### 3. Restart OMP
@@ -38,12 +34,20 @@ Restart OMP (or start a new session) for the change to take effect.
 
 ## How the endpoint is resolved
 
-The plugin picks the endpoint in this order:
+The plugin picks the endpoint in this order (first match wins):
 
-1. `ddgs.endpoint` in `~/.omp/agent/config.yml`
-2. the `DDGS_ENDPOINT` environment variable
-3. the default, `http://localhost:8091`
+1. **OMP plugin setting** `endpoint` (set via the TUI / `omp plugin config`) —
+   stored in `~/.omp/plugins/omp-plugins.lock.json`
+2. `ddgs.endpoint` in `~/.omp/agent/config.yml`, e.g.:
+   ```yaml
+   ddgs:
+     endpoint: https://your-ddgs-server.example.com
+   ```
+   (a flat `ddgs.endpoint: ...` key works too)
+3. the `DDGS_ENDPOINT` environment variable
+4. the default, `http://localhost:8091`
 
-> Note: this key is read by the plugin directly from `config.yml`. It is **not** part of
-> OMP's built-in `/settings` schema, so it will not show up in the `/settings` UI — edit
-> `config.yml` by hand as shown above.
+> Note: OMP doesn't expose plugin settings to extensions at runtime, so the plugin reads
+> the value directly from `omp-plugins.lock.json`. This setting is part of OMP's
+> **plugin** settings (`omp plugin config`), not the global `/settings` schema, so it
+> won't appear in the `/settings` UI.
