@@ -1,0 +1,23 @@
+{
+  "name": "omp-ddgs-search",
+  "version": "1.0.0",
+  "description": "DuckDuckGo search provider for Open-Managed Pi",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"no tests\" && exit 0"
+  },
+  "files": [
+    "index.ts",
+    "config.json"
+  ],
+  "keywords": [
+    "omp",
+    "extension",
+    "ddgs",
+    "duckduckgo",
+    "web-search"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}
