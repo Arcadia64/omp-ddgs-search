@@ -1,4 +1,8 @@
 
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 interface SearchEntry {
   title: string;
   link: string;
@@ -18,17 +22,73 @@ interface DdgsConfig {
   headers: Record<string, string>;
 }
 
-function loadConfig(settingsGet?: (key: string) => unknown): DdgsConfig {
-  // Priority: settings API > env var > hardcoded default.
-  if (settingsGet) {
-    try {
-      const ep = settingsGet("ddgs.endpoint");
-      if (typeof ep === "string") return { endpoint: ep, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-    } catch { /* ignore */ }
+const DEFAULT_ENDPOINT = "http://localhost:8091";
+const HEADERS: Record<string, string> = { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" };
+
+function stripScalar(v: string): string {
+  let s = v.trim();
+  // Drop a trailing inline comment ( ` # ...`).
+  const hash = s.indexOf(" #");
+  if (hash >= 0) s = s.slice(0, hash).trim();
+  // Strip matching surrounding quotes.
+  if (s.length >= 2 && ((s[0] === '"' && s.endsWith('"')) || (s[0] === "'" && s.endsWith("'")))) {
+    s = s.slice(1, -1);
   }
+  return s.trim();
+}
+
+// Read the DDGS endpoint from OMP's own config file (~/.omp/agent/config.yml).
+// Add it by hand as either a flat key or a nested block:
+//
+//   ddgs.endpoint: http://my-host:8091
+//
+//   ddgs:
+//     endpoint: http://my-host:8091
+function endpointFromConfigYml(): string | undefined {
+  try {
+    const raw = readFileSync(join(homedir(), ".omp", "agent", "config.yml"), "utf8");
+
+    // OMP runs on Bun — prefer its YAML parser when present.
+    const bun = (globalThis as { Bun?: { YAML?: { parse(s: string): unknown } } }).Bun;
+    if (bun?.YAML?.parse) {
+      const parsed = bun.YAML.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        const obj = parsed as Record<string, unknown>;
+        const flat = obj["ddgs.endpoint"];
+        if (typeof flat === "string" && flat.trim()) return flat.trim();
+        const ddgs = obj["ddgs"];
+        if (ddgs && typeof ddgs === "object") {
+          const ep = (ddgs as Record<string, unknown>)["endpoint"];
+          if (typeof ep === "string" && ep.trim()) return ep.trim();
+        }
+      }
+    }
+
+    // Fallback line scan (no YAML lib): flat `ddgs.endpoint:` or `endpoint:` under a `ddgs:` block.
+    let inDdgsBlock = false;
+    for (const line of raw.split(/\r?\n/)) {
+      const flat = line.match(/^ddgs\.endpoint\s*:\s*(.+)$/);
+      if (flat) return stripScalar(flat[1]);
+      if (/^ddgs\s*:\s*$/.test(line)) { inDdgsBlock = true; continue; }
+      if (inDdgsBlock) {
+        if (/^\S/.test(line)) { inDdgsBlock = false; continue; } // dedent → left the block
+        const nested = line.match(/^\s+endpoint\s*:\s*(.+)$/);
+        if (nested) return stripScalar(nested[1]);
+      }
+    }
+  } catch {
+    /* config.yml missing or unreadable — fall through to env/default */
+  }
+  return undefined;
+}
+
+function loadConfig(): DdgsConfig {
+  // Priority: config.yml (ddgs.endpoint) > DDGS_ENDPOINT env > hardcoded default.
+  const fromYml = endpointFromConfigYml();
+  if (fromYml) return { endpoint: fromYml, headers: HEADERS };
   const envEp = process.env.DDGS_ENDPOINT;
-  if (typeof envEp === "string") return { endpoint: envEp, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-  return { endpoint: "http://localhost:8091", headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
+  if (typeof envEp === "string" && envEp.trim()) return { endpoint: envEp.trim(), headers: HEADERS };
+  return { endpoint: DEFAULT_ENDPOINT, headers: HEADERS };
 }
 
 
@@ -114,8 +174,8 @@ export default function ddgsPlugin(pi: OmpExtensionApi): void {
       query: z.string().describe("Search query"),
       limit: z.number().int().min(1).max(20).optional().default(10).describe("Max results (1-20)"),
     }),
-    async execute(_id, params, _signal, _onUpdate, ctx) {
-      const cfg = loadConfig(typeof ctx?.settings?.get === "function" ? (ctx.settings.get.bind(ctx.settings) as (key: string) => unknown) : undefined);
+    async execute(_id, params, _signal, _onUpdate, _ctx) {
+      const cfg = loadConfig();
       const query = extractString(params, "query", "");
       if (query.length === 0) return { content: [{ type: "text", text: "Error: empty query" }] };
       const limitRaw = extractString(params, "limit", "10");
@@ -145,8 +205,8 @@ export default function ddgsPlugin(pi: OmpExtensionApi): void {
       query: z.string().describe("News search query"),
       limit: z.number().int().min(1).max(20).optional().default(10).describe("Max results (1-20)"),
     }),
-    async execute(_id, params, _signal, _onUpdate, ctx) {
-      const cfg = loadConfig(typeof ctx?.settings?.get === "function" ? (ctx.settings.get.bind(ctx.settings) as (key: string) => unknown) : undefined);
+    async execute(_id, params, _signal, _onUpdate, _ctx) {
+      const cfg = loadConfig();
       const query = extractString(params, "query", "");
       if (query.length === 0) return { content: [{ type: "text", text: "Error: empty query" }] };
       const limitRaw = extractString(params, "limit", "10");
@@ -176,8 +236,8 @@ export default function ddgsPlugin(pi: OmpExtensionApi): void {
       url: z.string().url().describe("URL to fetch"),
       render: z.boolean().optional().default(false).describe("Force headless browser rendering"),
     }),
-    async execute(_id, params, _signal, _onUpdate, ctx) {
-      const cfg = loadConfig(typeof ctx?.settings?.get === "function" ? (ctx.settings.get.bind(ctx.settings) as (key: string) => unknown) : undefined);
+    async execute(_id, params, _signal, _onUpdate, _ctx) {
+      const cfg = loadConfig();
       const targetUrl = extractString(params, "url", "");
       if (targetUrl.length === 0) return { content: [{ type: "text", text: "Error: empty URL" }] };
       const renderRaw = extractString(params, "render", "false");
