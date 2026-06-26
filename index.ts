@@ -26,11 +26,10 @@ interface DdgsConfig {
 function loadConfig(): DdgsConfig {
   const defaultEndpoint = "http://localhost:8091";
   
-  // Look for config in ~/.omp/agent/ddgs-search-config.json
+  // Look for config in ~/.omp/agent/ddgs.json
   const home = os.homedir();
   if (!home) return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-  
-  const configPath = path.join(home, ".omp", "agent", "ddgs-search-config.json");
+  const configPath = path.join(home, ".omp", "agent", "ddgs.json");
   try {
     if (fs.existsSync(configPath)) {
       const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
