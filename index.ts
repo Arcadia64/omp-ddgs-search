@@ -64,36 +64,6 @@ function loadConfig(settingsGet?: (key: string) => unknown): DdgsConfig {
   return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
 }
 
-function loadConfig(): DdgsConfig {
-  const defaultEndpoint = "http://localhost:8091";
-  
-  // Try config.yml first
-  const home = os.homedir();
-  if (home) {
-    const configPath = path.join(home, ".omp", "agent", "config.yml");
-    try {
-      if (fs.existsSync(configPath)) {
-        const content = fs.readFileSync(configPath, "utf-8");
-        const parsed = parseYamlEndpoint(content);
-        if (parsed) return { endpoint: parsed, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-      }
-    } catch { /* ignore parse errors, use default */ }
-  }
-  
-  // Fallback to standalone JSON file if it exists
-  const fallbackPath = path.join(home || "", ".omp", "agent", "ddgs.json");
-  try {
-    if (fs.existsSync(fallbackPath)) {
-      const raw = JSON.parse(fs.readFileSync(fallbackPath, "utf-8"));
-      if (raw && typeof raw === "object" && "endpoint" in raw && typeof raw.endpoint === "string") {
-        return { endpoint: raw.endpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-      }
-    }
-  } catch { /* ignore parse errors, use default */ }
-  
-  // Final fallback
-  return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-}
 
 function formatResults(entries: SearchEntry[]): string {
   if (entries.length === 0) return "No results found.";
