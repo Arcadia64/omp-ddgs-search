@@ -19,13 +19,15 @@ interface DdgsConfig {
 }
 
 function loadConfig(settingsGet?: (key: string) => unknown): DdgsConfig {
-  // Settings API (via /settings UI) if available, otherwise use hardcoded default.
+  // Priority: settings API > env var > hardcoded default.
   if (settingsGet) {
     try {
       const ep = settingsGet("ddgs.endpoint");
       if (typeof ep === "string") return { endpoint: ep, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
     } catch { /* ignore */ }
   }
+  const envEp = process.env.DDGS_ENDPOINT;
+  if (typeof envEp === "string") return { endpoint: envEp, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
   return { endpoint: "http://localhost:8091", headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
 }
 
