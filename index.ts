@@ -27,6 +27,8 @@ function loadConfig(settingsGet?: (key: string) => unknown): DdgsConfig {
     } catch { /* ignore */ }
   }
   return { endpoint: "http://localhost:8091", headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
+}
+
 
 
 function formatResults(entries: SearchEntry[]): string {
@@ -86,7 +88,7 @@ interface OmpExtensionApi {
     label: string;
     description: string;
     parameters: Record<string, unknown>;
-    async execute(
+    execute(
       id: string,
       params: Record<string, unknown>,
       signal: AbortSignal | undefined,
