@@ -23,22 +23,67 @@ interface DdgsConfig {
   headers: Record<string, string>;
 }
 
+function parseYamlEndpoint(content: string): string | null {
+  const lines = content.split(/\r?\n/);
+  let inDdgsBlock = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith('ddgs:')) continue;
+    
+    // Check if ddgs is inline: ddgs: { endpoint: "url" }
+    const inlineMatch = line.match(/^ddgs:\s*\{.*endpoint:\s*["']?([^"'{}\s,]+)["']?.*/);
+    if (inlineMatch) return inlineMatch[1];
+    
+    // Check if next lines are nested under ddgs:
+    inDdgsBlock = true;
+    for (let j = i + 1; j < lines.length; j++) {
+      const nextLine = lines[j].trim();
+      const indentMatch = lines[j].match(/^(\s*)/);
+      if (!indentMatch) break;
+      
+      // Empty line or comment in block
+      if (nextLine === '' || nextLine.startsWith('#')) continue;
+      
+      // New top-level key means ddgs block ended
+      if (lines[j].search(/^\w/) !== -1 && !lines[j].startsWith(' ')) break;
+      
+      // Look for endpoint: value under ddgs
+      const epMatch = nextLine.match(/^endpoint:\s*["']?([^"'\s,]+)["']?/);
+      if (epMatch) return epMatch[1];
+      break;
+    }
+  }
+  return null;
+}
+
 function loadConfig(): DdgsConfig {
   const defaultEndpoint = "http://localhost:8091";
   
-  // Look for config in ~/.omp/agent/ddgs.json
+  // Try config.yml first
   const home = os.homedir();
-  if (!home) return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-  const configPath = path.join(home, ".omp", "agent", "ddgs.json");
+  if (home) {
+    const configPath = path.join(home, ".omp", "agent", "config.yml");
+    try {
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, "utf-8");
+        const parsed = parseYamlEndpoint(content);
+        if (parsed) return { endpoint: parsed, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
+      }
+    } catch { /* ignore parse errors, use default */ }
+  }
+  
+  // Fallback to standalone JSON file if it exists
+  const fallbackPath = path.join(home || "", ".omp", "agent", "ddgs.json");
   try {
-    if (fs.existsSync(configPath)) {
-      const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (fs.existsSync(fallbackPath)) {
+      const raw = JSON.parse(fs.readFileSync(fallbackPath, "utf-8"));
       if (raw && typeof raw === "object" && "endpoint" in raw && typeof raw.endpoint === "string") {
         return { endpoint: raw.endpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
       }
     }
   } catch { /* ignore parse errors, use default */ }
   
+  // Final fallback
   return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
 }
 

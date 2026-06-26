@@ -12,6 +12,9 @@ OMP auto-discovers the extension on next session start.
 
 ## Configuration
 
-By default this uses `http://localhost:8091`. To configure a custom DDGS endpoint, create `~/.omp/agent/ddgs.json` with your URL:
+By default this uses `http://localhost:8091`. To configure a custom DDGS endpoint, add to `~/.omp/agent/config.yml`:
 
-No restart needed — the config is read at session start.
+```yaml
+ddgs:
+  endpoint: "https://your-ddgs-server.example.com"
+```
