@@ -19,5 +19,10 @@
     "web-search"
   ],
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {},
+  "omp": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
 }
