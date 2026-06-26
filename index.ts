@@ -2,6 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 
 interface SearchEntry {
   title: string;
@@ -23,21 +24,23 @@ interface DdgsConfig {
 }
 
 function loadConfig(): DdgsConfig {
-  const configPath = path.join(__dirname, "config.json");
-  let endpoint = "http://localhost:8091"; // fallback
+  const defaultEndpoint = "http://localhost:8091";
+  
+  // Look for config in ~/.omp/agent/ddgs-search-config.json
+  const home = os.homedir();
+  if (!home) return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
+  
+  const configPath = path.join(home, ".omp", "agent", "ddgs-search-config.json");
   try {
     if (fs.existsSync(configPath)) {
       const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       if (raw && typeof raw === "object" && "endpoint" in raw && typeof raw.endpoint === "string") {
-        endpoint = raw.endpoint;
+        return { endpoint: raw.endpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
       }
     }
-  } catch { /* ignore config parse errors, use default */ }
-
-  return {
-    endpoint,
-    headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" },
-  };
+  } catch { /* ignore parse errors, use default */ }
+  
+  return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
 }
 
 function formatResults(entries: SearchEntry[]): string {
