@@ -1,8 +1,3 @@
-// -- OMP extension: DuckDuckGo search via configurable remote backend ------
-
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
 
 interface SearchEntry {
   title: string;
@@ -24,45 +19,14 @@ interface DdgsConfig {
 }
 
 function loadConfig(settingsGet?: (key: string) => unknown): DdgsConfig {
-  const defaultEndpoint = "http://localhost:8091";
-  
-  // 1) OMP Settings API (via /settings UI) - highest priority at runtime
+  // Settings API (via /settings UI) if available, otherwise use hardcoded default.
   if (settingsGet) {
     try {
-      const endpoint = settingsGet("ddgs.endpoint");
-      if (typeof endpoint === "string") {
-        return { endpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-      }
-    } catch { /* ignore, fall through */ }
+      const ep = settingsGet("ddgs.endpoint");
+      if (typeof ep === "string") return { endpoint: ep, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
+    } catch { /* ignore */ }
   }
-  
-  // 2) Parse config.yml directly (for /settings users or manual config)
-  const home = os.homedir();
-  if (home) {
-    const configPath = path.join(home, ".omp", "agent", "config.yml");
-    try {
-      if (fs.existsSync(configPath)) {
-        const content = fs.readFileSync(configPath, "utf-8");
-        const parsed = parseYamlEndpoint(content);
-        if (parsed) return { endpoint: parsed, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-      }
-    } catch { /* ignore parse errors, use default */ }
-  }
-  
-  // 3) Fallback to standalone JSON file if it exists
-  const fallbackPath = path.join(home || "", ".omp", "agent", "ddgs.json");
-  try {
-    if (fs.existsSync(fallbackPath)) {
-      const raw = JSON.parse(fs.readFileSync(fallbackPath, "utf-8"));
-      if (raw && typeof raw === "object" && "endpoint" in raw && typeof raw.endpoint === "string") {
-        return { endpoint: raw.endpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-      }
-    }
-  } catch { /* ignore parse errors, use default */ }
-  
-  // 4) Final fallback
-  return { endpoint: defaultEndpoint, headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
-}
+  return { endpoint: "http://localhost:8091", headers: { Accept: "application/json", "User-Agent": "OMP-DdgsSearch/1.0" } };
 
 
 function formatResults(entries: SearchEntry[]): string {
